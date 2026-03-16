@@ -1180,20 +1180,16 @@
             if (joinRoom) {
                 document.getElementById('room-id-input').value = joinRoom;
                 showJoinRoom();
-                // 使用房间号作为云端存储 ID
                 roomId = joinRoom;
-                cloudBinId = joinRoom;
-                window.cloudBinId = joinRoom;
-                // 尝试从云端加载数据
-                loadFromCloud(joinRoom).then(loaded => {
-                    if (loaded) {
-                        renderAll();
-                        showToast('已从云端同步数据', 'success');
-                    }
-                });
+                // 加入房间
+                document.getElementById('setup-panel').style.display = 'none';
+                document.getElementById('main-app').style.display = 'block';
+                document.getElementById('header-room-id').textContent = roomId;
+                loadData();
+                renderAll();
             }
 
-            // 加载本地数据（如果云端没加载成功）
+            // 加载本地数据
             loadData();
 
             // 渲染页面
@@ -1220,12 +1216,11 @@
         function createRoom() {
             // 创建新房间
             roomId = generateRoomId();
-            cloudBinId = roomId;
-            window.cloudBinId = roomId;
-            localStorage.setItem('cloud_bin_id', roomId);
+            localStorage.setItem('wedding_room_id', roomId);
+
+            document.getElementById('current-room-id').textContent = roomId;
 
             // 隐藏欢迎界面，显示主应用
-            document.getElementById('welcome-section').style.display = 'none';
             document.getElementById('setup-panel').style.display = 'none';
             document.getElementById('main-app').style.display = 'block';
             document.getElementById('header-room-id').textContent = roomId;
@@ -1234,11 +1229,9 @@
             const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?room=' + roomId;
             window.history.pushState({path: newUrl}, '', newUrl);
 
-            // 创建云端存储
-            saveToCloud();
             setupEventListeners();
             renderAll();
-            showToast('房间已创建，数据将同步到云端', 'success');
+            showToast('房间已创建', 'success');
         }
 
         function joinRoom() {
@@ -1249,56 +1242,32 @@
             }
 
             roomId = inputRoomId;
-            cloudBinId = inputRoomId;
-            window.cloudBinId = inputRoomId;
+            localStorage.setItem('wedding_room_id', roomId);
 
-            // 尝试从云端加载数据
-            loadFromCloud(inputRoomId).then(loaded => {
-                document.getElementById('create-room-section').style.display = 'none';
-                document.getElementById('welcome-section').style.display = 'none';
-                document.getElementById('main-app').style.display = 'block';
-                renderAll();
+            // 加入房间，显示主应用
+            document.getElementById('setup-panel').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            document.getElementById('header-room-id').textContent = roomId;
 
-                if (loaded) {
-                    showToast('已加入房间并同步数据', 'success');
-                } else {
-                    showToast('房间不存在，已创建新房间', 'info');
-                    // 如果云端没有数据，创建新数据
-                    data = { guests: [], tables: [] };
-                }
-            });
+            // 更新 URL
+            const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?room=' + roomId;
+            window.history.pushState({path: newUrl}, '', newUrl);
+
+            // 加载本地数据
+            loadData();
+            renderAll();
+            showToast('已加入房间', 'success');
         }
 
         function connectToRoom() {
-            // 使用 JSONBin.io 连接房间
+            // 连接房间，定期刷新页面
             if (!roomId) return;
 
-            cloudBinId = roomId;
-            window.cloudBinId = roomId;
-
-            // 定期从云端同步数据
+            // 定期从 localStorage 加载最新数据
             setInterval(() => {
-                loadFromCloud(roomId).then(loaded => {
-                    if (loaded) {
-                        renderAll();
-                    }
-                });
-            }, 5000); // 每5秒同步一次
-                    // 新房间，初始化空数据
-                    data = { guests: [], tables: [] };
-                    roomRef.set(data);
-                }
-
-                if (document.getElementById('main-app').style.display !== 'none') {
-                    renderAll();
-                }
-
-                updateSyncStatus('connected');
-            }, (error) => {
-                console.error('同步失败:', error);
-                updateSyncStatus('disconnected');
-                showToast('连接失败: ' + error.message, 'error');
-            });
+                loadData();
+                renderAll();
+            }, 3000); // 每3秒刷新一次
         }
 
         function enterRoom() {
@@ -1423,45 +1392,15 @@
             renderAll();
         }
 
-        // 保存数据到 localStorage 和云端
+        // 保存数据到 localStorage
         function saveData() {
-            // 保存到本地存储
             try {
                 localStorage.setItem('wedding_seating_data', JSON.stringify(data));
                 console.log('数据已保存到本地');
             } catch (e) {
-                console.error('本地保存失败:', e);
-            }
-
-            // 保存到云端 (使用 jsonbin.io)
-            if (roomId && window.cloudBinId) {
-                saveToCloud();
+                console.error('保存失败:', e);
             }
         }
-
-        // 云端存储
-        let cloudBinId = localStorage.getItem('cloud_bin_id');
-
-        async function saveToCloud() {
-            if (!cloudBinId) {
-                // 创建新的 bin
-                try {
-                    const response = await fetch('https://api.jsonbin.io/v3/b', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(data)
-                    });
-                    const result = await response.json();
-                    cloudBinId = result.metadata.id;
-                    localStorage.setItem('cloud_bin_id', cloudBinId);
-                    window.cloudBinId = cloudBinId;
-                    console.log('已创建云端存储:', cloudBinId);
-                } catch (e) {
-                    console.error('云端保存失败:', e);
-                }
-            } else {
                 // 更新现有 bin
                 try {
                     await fetch(`https://api.jsonbin.io/v3/b/${cloudBinId}`, {
@@ -1476,26 +1415,6 @@
                     console.error('云端更新失败:', e);
                 }
             }
-        }
-
-        async function loadFromCloud(binId) {
-            try {
-                const response = await fetch(`https://api.jsonbin.io/v3/b/${binId}/latest`, {
-                    method: 'GET',
-                    headers: {
-                        'Accept': 'application/json'
-                    }
-                });
-                if (response.ok) {
-                    const cloudData = await response.json();
-                    data = cloudData.record;
-                    console.log('已从云端加载数据');
-                    return true;
-                }
-            } catch (e) {
-                console.error('云端加载失败:', e);
-            }
-            return false;
         }
 
         // 从 localStorage 加载数据
