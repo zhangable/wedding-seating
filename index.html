@@ -1,0 +1,2068 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>婚礼座位安排工具</title>
+    <style>
+        :root {
+            --primary: #D4A574;
+            --primary-dark: #B8956A;
+            --secondary: #8B4513;
+            --bg: #FFF8F0;
+            --bg-card: #FFFFFF;
+            --text: #333333;
+            --text-light: #666666;
+            --success: #4CAF50;
+            --warning: #FF9800;
+            --danger: #F44336;
+            --border: #E8DDD4;
+            --shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: "Microsoft YaHei", "PingFang SC", sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            padding: 16px 24px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            box-shadow: var(--shadow);
+        }
+
+        .header h1 {
+            color: white;
+            font-size: 1.5rem;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        .sync-status {
+            text-align: center;
+            color: rgba(255,255,255,0.8);
+            font-size: 0.85rem;
+            margin-bottom: 10px;
+        }
+
+        .sync-status.connected {
+            color: #90EE90;
+        }
+
+        .sync-status.disconnected {
+            color: #FFB6C1;
+        }
+
+        .nav {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .nav-btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            cursor: pointer;
+            font-size: 0.95rem;
+            transition: all 0.3s ease;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .nav-btn.active {
+            background: white;
+            color: var(--primary-dark);
+            font-weight: 600;
+        }
+
+        /* Main */
+        .main {
+            padding: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .page {
+            display: none;
+        }
+
+        .page.active {
+            display: block;
+        }
+
+        /* Setup Panel */
+        .setup-panel {
+            background: var(--bg-card);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: var(--shadow);
+            max-width: 500px;
+            margin: 40px auto;
+            text-align: center;
+        }
+
+        .setup-panel h2 {
+            color: var(--secondary);
+            margin-bottom: 20px;
+        }
+
+        .setup-panel p {
+            color: var(--text-light);
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .setup-panel input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            font-size: 1rem;
+            margin-bottom: 15px;
+        }
+
+        .setup-panel input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .setup-panel .btn {
+            width: 100%;
+            padding: 14px;
+            font-size: 1rem;
+        }
+
+        .room-id-display {
+            background: #F5F5F5;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .room-id-display code {
+            background: var(--primary);
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 1.1rem;
+        }
+
+        .copy-btn {
+            background: var(--secondary);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-left: 10px;
+        }
+
+        /* Toolbar */
+        .toolbar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 20px;
+            align-items: center;
+        }
+
+        .toolbar-left {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+            flex: 1;
+        }
+
+        .toolbar-right {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--primary-dark);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #d32f2f;
+        }
+
+        .btn-success {
+            background: var(--success);
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #43a047;
+        }
+
+        /* Search */
+        .search-box {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            min-width: 200px;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .filter-select {
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.9rem;
+            background: white;
+        }
+
+        /* Table */
+        .table-container {
+            background: var(--bg-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .table-scroll {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            min-width: 800px;
+        }
+
+        th, td {
+            padding: 14px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            background: #FAF5EE;
+            font-weight: 600;
+            color: var(--secondary);
+            position: sticky;
+            top: 0;
+        }
+
+        tr:hover {
+            background: #FFFBF7;
+        }
+
+        .vip-badge {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            color: #333;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            background: var(--border);
+            color: var(--text-light);
+        }
+
+        .tag-family { background: #E3F2FD; color: #1565C0; }
+        .tag-friend { background: #E8F5E9; color: #2E7D32; }
+        .tag-colleague { background: #FFF3E0; color: #E65100; }
+        .tag-bride { background: #FCE4EC; color: #C2185B; }
+        .tag-groom { background: #E8EAF6; color: #303F9F; }
+
+        .action-btns {
+            display: flex;
+            gap: 6px;
+        }
+
+        .btn-icon {
+            padding: 6px 10px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.8rem;
+        }
+
+        .btn-edit { background: #E3F2FD; color: #1976D2; }
+        .btn-edit:hover { background: #BBDEFB; }
+        .btn-del { background: #FFEBEE; color: #C62828; }
+        .btn-del:hover { background: #FFCDD2; }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: white;
+            border-radius: 12px;
+            width: 100%;
+            max-width: 500px;
+            max-height: 90vh;
+            overflow-y: auto;
+            animation: modalIn 0.3s ease;
+        }
+
+        @keyframes modalIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .modal-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h2 {
+            font-size: 1.25rem;
+            color: var(--secondary);
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-light);
+        }
+
+        .modal-body {
+            padding: 20px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.95rem;
+            font-family: inherit;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .checkbox-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .checkbox-group input {
+            width: auto;
+        }
+
+        .modal-footer {
+            padding: 16px 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+        }
+
+        /* Table Management Page */
+        .tables-layout {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 20px;
+        }
+
+        @media (max-width: 1024px) {
+            .tables-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .tables-list {
+            background: var(--bg-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            padding: 20px;
+        }
+
+        .tables-list h3 {
+            margin-bottom: 16px;
+            color: var(--secondary);
+        }
+
+        .table-card {
+            background: #FAF5EE;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .table-card:hover {
+            border-color: var(--primary);
+        }
+
+        .table-card.selected {
+            border-color: var(--primary);
+            background: #FFF8F0;
+        }
+
+        .table-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .table-card-title {
+            font-weight: 600;
+            color: var(--secondary);
+        }
+
+        .table-card-type {
+            font-size: 0.8rem;
+            color: var(--text-light);
+        }
+
+        .table-card-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+        }
+
+        .table-card-actions {
+            display: flex;
+            gap: 6px;
+            margin-top: 10px;
+        }
+
+        /* Drop Zone */
+        .drop-zone {
+            background: var(--bg-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            padding: 20px;
+            min-height: 400px;
+        }
+
+        .drop-zone h3 {
+            margin-bottom: 16px;
+            color: var(--secondary);
+        }
+
+        .unassigned-guests {
+            margin-bottom: 20px;
+            padding: 16px;
+            background: #F5F5F5;
+            border-radius: 8px;
+            border: 2px dashed #ccc;
+        }
+
+        .unassigned-guests.drag-over {
+            border-color: var(--primary);
+            background: #FFF8F0;
+        }
+
+        .guest-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+
+        .guest-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 6px 12px;
+            background: white;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: grab;
+            transition: all 0.2s;
+        }
+
+        .guest-tag:hover {
+            border-color: var(--primary);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .guest-tag.dragging {
+            opacity: 0.5;
+        }
+
+        .guest-tag.vip {
+            background: linear-gradient(135deg, #FFF8E1, #FFECB3);
+            border-color: #FFD700;
+        }
+
+        .guest-tag.assigned {
+            background: #E8F5E9;
+            border-color: var(--success);
+        }
+
+        /* Seat Map Page */
+        .seat-map {
+            background: var(--bg-card);
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            padding: 20px;
+        }
+
+        .seat-map-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .seat-table {
+            background: #FAF5EE;
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            min-height: 180px;
+            transition: all 0.2s;
+        }
+
+        .seat-table.drag-over {
+            border-color: var(--primary);
+            background: #FFF8F0;
+            transform: scale(1.02);
+        }
+
+        .seat-table-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .seat-table-name {
+            font-weight: 600;
+            color: var(--secondary);
+        }
+
+        .seat-table-count {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            background: white;
+            padding: 2px 10px;
+            border-radius: 10px;
+        }
+
+        .seat-table-guests {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .seat-guest {
+            padding: 4px 10px;
+            background: white;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            cursor: grab;
+            border: 1px solid var(--border);
+        }
+
+        .seat-guest.vip {
+            background: linear-gradient(135deg, #FFF8E1, #FFECB3);
+            border-color: #FFD700;
+        }
+
+        .empty-table {
+            text-align: center;
+            color: var(--text-light);
+            padding: 40px;
+            font-size: 0.9rem;
+        }
+
+        /* Stats */
+        .stats {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .stat-card {
+            background: var(--bg-card);
+            padding: 16px 24px;
+            border-radius: 8px;
+            box-shadow: var(--shadow);
+            flex: 1;
+            min-width: 150px;
+        }
+
+        .stat-value {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-top: 4px;
+        }
+
+        /* Confirm Dialog */
+        .confirm-dialog {
+            text-align: center;
+        }
+
+        .confirm-dialog p {
+            margin-bottom: 20px;
+            font-size: 1rem;
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 14px 24px;
+            background: var(--text);
+            color: white;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 2000;
+            animation: toastIn 0.3s ease;
+        }
+
+        .toast.success { background: var(--success); }
+        .toast.error { background: var(--danger); }
+        .toast.warning { background: var(--warning); }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Empty State */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-light);
+        }
+
+        .empty-state-icon {
+            font-size: 4rem;
+            margin-bottom: 16px;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 1.25rem;
+            }
+
+            .nav-btn {
+                padding: 8px 14px;
+                font-size: 0.85rem;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .toolbar-left, .toolbar-right {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .search-input {
+                width: 100%;
+            }
+
+            .btn {
+                flex: 1;
+                justify-content: center;
+            }
+
+            th, td {
+                padding: 10px 12px;
+                font-size: 0.85rem;
+            }
+        }
+
+        /* Checkbox custom */
+        .checkbox-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        /* File input */
+        .file-input {
+            display: none;
+        }
+
+        .file-label {
+            display: inline-block;
+            padding: 10px 18px;
+            background: #6c757d;
+            color: white;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9rem;
+        }
+
+        .file-label:hover {
+            background: #5a6268;
+        }
+
+        .data-actions {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+    </style>
+</head>
+<body>
+    <!-- Setup Panel -->
+    <div id="setup-panel" class="setup-panel">
+        <h2>💒 婚礼座位安排</h2>
+        <p>创建一个房间或输入已有房间号，与家人朋友一起协作安排座位</p>
+
+        <div id="create-room-section">
+            <button class="btn btn-primary" onclick="createRoom()">创建新房间</button>
+        </div>
+
+        <div id="join-room-section" style="display:none;">
+            <input type="text" id="room-id-input" placeholder="输入房间号">
+            <button class="btn btn-primary" onclick="joinRoom()">加入房间</button>
+            <p style="margin-top:15px;">
+                <a href="#" onclick="showCreateRoom();return false;">创建新房间</a>
+            </p>
+        </div>
+
+        <div id="room-info" style="display:none;">
+            <p>房间创建成功！</p>
+            <div class="room-id-display">
+                房间号: <code id="current-room-id"></code>
+                <button class="copy-btn" onclick="copyRoomId()">复制</button>
+            </div>
+            <p style="font-size:0.9rem;color:var(--text-light)">分享房间号给其他人，他们可以一起编辑</p>
+            <button class="btn btn-primary" onclick="enterRoom()">进入编辑</button>
+            <button class="btn btn-secondary" onclick="generateShareLink()">生成公开只读链接</button>
+            <div id="share-link-container" style="display:none;margin-top:15px;">
+                <p style="font-size:0.9rem;color:var(--text-light)">复制以下链接分享给宾客查看座位安排（仅限查看）：</p>
+                <div class="room-id-display">
+                    <code id="share-link-url" style="font-size:0.8rem;word-break:break-all;"></code>
+                    <button class="copy-btn" onclick="copyShareLink()">复制链接</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="main-app" style="display:none;">
+        <header class="header">
+            <h1>💒 婚礼座位安排</h1>
+            <div class="sync-status" id="sync-status">
+                <span id="sync-text">正在连接...</span>
+            </div>
+            <div style="text-align:center;margin-bottom:10px;">
+                <span style="background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:12px;font-size:0.8rem;color:white;">
+                    房间: <span id="header-room-id"></span>
+                </span>
+            </div>
+            <nav class="nav">
+                <button class="nav-btn active" data-page="guests">宾客管理</button>
+                <button class="nav-btn" data-page="tables">桌位管理</button>
+                <button class="nav-btn" data-page="seats">座位图</button>
+            </nav>
+        </header>
+
+        <main class="main">
+            <!-- Guests Page -->
+            <div class="page active" id="guests-page">
+                <div class="toolbar">
+                    <div class="toolbar-left">
+                        <div class="search-box">
+                            <input type="text" class="search-input" id="guest-search" placeholder="搜索姓名或手机号...">
+                            <select class="filter-select" id="group-filter">
+                                <option value="">全部分组</option>
+                                <option value="家人">家人</option>
+                                <option value="朋友">朋友</option>
+                                <option value="同事">同事</option>
+                                <option value="新娘方">新娘方</option>
+                                <option value="新郎方">新郎方</option>
+                            </select>
+                            <select class="filter-select" id="vip-filter">
+                                <option value="">全部</option>
+                                <option value="vip">VIP</option>
+                                <option value="non-vip">非VIP</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="toolbar-right">
+                        <button class="btn btn-primary" onclick="openGuestModal()">+ 添加宾客</button>
+                        <button class="btn btn-danger" onclick="batchDeleteGuests()">批量删除</button>
+                    </div>
+                </div>
+
+                <div class="toolbar">
+                    <div class="data-actions">
+                        <button class="btn btn-success" onclick="exportJSON()">导出JSON</button>
+                        <button class="btn btn-success" onclick="exportCSV()">导出CSV</button>
+                        <label class="file-label">
+                            导入JSON
+                            <input type="file" class="file-input" id="import-file" accept=".json" onchange="importJSON(event)">
+                        </label>
+                    </div>
+                </div>
+
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-value" id="total-guests">0</div>
+                        <div class="stat-label">总宾客数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="total-vip">0</div>
+                        <div class="stat-label">VIP宾客</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="assigned-guests">0</div>
+                        <div class="stat-label">已安排座位</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="unassigned-guests">0</div>
+                        <div class="stat-label">未安排座位</div>
+                    </div>
+                </div>
+
+                <div class="table-container">
+                    <div class="table-scroll">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width:40px;"><input type="checkbox" id="select-all" onchange="toggleSelectAll()"></th>
+                                    <th>姓名</th>
+                                    <th>手机号</th>
+                                    <th>分组</th>
+                                    <th>VIP</th>
+                                    <th>特殊需求</th>
+                                    <th>饮食偏好</th>
+                                    <th>座位</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="guests-table-body">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tables Page -->
+            <div class="page" id="tables-page">
+                <div class="toolbar">
+                    <button class="btn btn-primary" onclick="openTableModal()">+ 添加桌位</button>
+                </div>
+
+                <div class="stats">
+                    <div class="stat-card">
+                        <div class="stat-value" id="total-tables">0</div>
+                        <div class="stat-label">总桌数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="total-seats">0</div>
+                        <div class="stat-label">总座位数</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value" id="used-seats">0</div>
+                        <div class="stat-label">已用座位</div>
+                    </div>
+                </div>
+
+                <div class="tables-layout">
+                    <div class="tables-list">
+                        <h3>桌位列表</h3>
+                        <div id="tables-container"></div>
+                    </div>
+                    <div class="drop-zone">
+                        <h3>分配宾客</h3>
+                        <div class="unassigned-guests" id="unassigned-zone">
+                            <p style="margin-bottom: 10px; font-weight: 500;">未分配宾客 (拖拽到右侧桌位):</p>
+                            <div class="guest-tags" id="unassigned-guests-list"></div>
+                        </div>
+                        <div id="table-guests"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Seats Page -->
+            <div class="page" id="seats-page">
+                <div class="toolbar">
+                    <button class="btn btn-secondary" onclick="resetAllSeats()">重置所有座位</button>
+                </div>
+                <div class="seat-map">
+                    <div class="seat-map-grid" id="seat-map-grid"></div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Guest Modal -->
+    <div class="modal-overlay" id="guest-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="guest-modal-title">添加宾客</h2>
+                <button class="modal-close" onclick="closeGuestModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="guest-form">
+                    <input type="hidden" id="guest-id">
+                    <div class="form-group">
+                        <label>姓名 *</label>
+                        <input type="text" id="guest-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>手机号</label>
+                        <input type="tel" id="guest-phone">
+                    </div>
+                    <div class="form-group">
+                        <label>分组</label>
+                        <select id="guest-group">
+                            <option value="家人">家人</option>
+                            <option value="朋友">朋友</option>
+                            <option value="同事">同事</option>
+                            <option value="新娘方">新娘方</option>
+                            <option value="新郎方">新郎方</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <div class="checkbox-wrapper">
+                            <input type="checkbox" id="guest-vip">
+                            <label for="guest-vip">VIP宾客</label>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>特殊需求</label>
+                        <input type="text" id="guest-special" placeholder="如：需要轮椅通道">
+                    </div>
+                    <div class="form-group">
+                        <label>饮食偏好</label>
+                        <select id="guest-dietary">
+                            <option value="无特殊要求">无特殊要求</option>
+                            <option value="素食">素食</option>
+                            <option value="清真">清真</option>
+                            <option value="海鲜过敏">海鲜过敏</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>备注</label>
+                        <textarea id="guest-note" placeholder="其他备注信息"></textarea>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeGuestModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveGuest()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Modal -->
+    <div class="modal-overlay" id="table-modal">
+        <div class="modal">
+            <div class="modal-header">
+                <h2 id="table-modal-title">添加桌位</h2>
+                <button class="modal-close" onclick="closeTableModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="table-form">
+                    <input type="hidden" id="table-id">
+                    <div class="form-group">
+                        <label>桌号名称 *</label>
+                        <input type="text" id="table-name" required placeholder="如：主桌1、副桌A">
+                    </div>
+                    <div class="form-group">
+                        <label>桌型</label>
+                        <select id="table-type">
+                            <option value="round">圆桌</option>
+                            <option value="square">方桌</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>人数上限</label>
+                        <input type="number" id="table-capacity" value="10" min="1" max="20">
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeTableModal()">取消</button>
+                <button class="btn btn-primary" onclick="saveTable()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirm Modal -->
+    <div class="modal-overlay" id="confirm-modal">
+        <div class="modal" style="max-width: 400px;">
+            <div class="modal-header">
+                <h2>确认操作</h2>
+                <button class="modal-close" onclick="closeConfirmModal()">&times;</button>
+            </div>
+            <div class="modal-body confirm-dialog">
+                <p id="confirm-message"></p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeConfirmModal()">取消</button>
+                <button class="btn btn-danger" id="confirm-btn">确认</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
+
+    <script>
+        // Firebase 配置 - 请替换为你自己的配置
+        // 要获取配置: https://console.firebase.google.com -> 创建项目 -> 添加应用
+        const firebaseConfig = {
+            apiKey: "AIzaSyDEMO",
+            authDomain: "your-project.firebaseapp.com",
+            databaseURL: "https://your-project-default-rtdb.firebaseio.com",
+            projectId: "your-project",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "1:123456789:web:abc123"
+        };
+
+        // 初始化 Firebase
+        let database;
+        let roomRef;
+        let unsubscribe;
+
+        // 数据状态
+        let data = {
+            guests: [],
+            tables: []
+        };
+
+        let roomId = null;
+        let useLocalStorage = true;  // 默认使用本地存储
+        let currentEditingGuestId = null;
+        let currentEditingTableId = null;
+        let selectedTableId = null;
+        let draggedGuestId = null;
+        let isReadOnly = false;  // 只读模式标志
+
+        // 初始化
+        function init() {
+            // 检查 URL 参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const joinRoom = urlParams.get('room');
+            const viewRoom = urlParams.get('view');  // 只读查看模式
+
+            // 只读视图模式
+            if (viewRoom) {
+                isReadOnly = true;
+                roomId = viewRoom;
+                initReadOnlyMode(viewRoom);
+                return;
+            }
+
+            if (joinRoom) {
+                document.getElementById('room-id-input').value = joinRoom;
+                showJoinRoom();
+            }
+
+            // 加载本地数据
+            loadData();
+
+            // 渲染页面
+            renderAll();
+
+            // 初始化 Firebase（可选）
+            try {
+                firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
+                updateSyncStatus('disconnected');
+            } catch (e) {
+                console.log('Firebase 未配置，使用本地存储模式');
+            }
+        }
+
+        // 房间管理
+        function showCreateRoom() {
+            document.getElementById('create-room-section').style.display = 'block';
+            document.getElementById('join-room-section').style.display = 'none';
+            document.getElementById('room-info').style.display = 'none';
+        }
+
+        function showJoinRoom() {
+            document.getElementById('create-room-section').style.display = 'none';
+            document.getElementById('join-room-section').style.display = 'block';
+            document.getElementById('room-info').style.display = 'none';
+        }
+
+        function generateRoomId() {
+            return Math.random().toString(36).substring(2, 8).toUpperCase();
+        }
+
+        function createRoom() {
+            if (!database) {
+                showToast('Firebase 未配置，请先配置', 'error');
+                return;
+            }
+
+            roomId = generateRoomId();
+            document.getElementById('current-room-id').textContent = roomId;
+
+            document.getElementById('create-room-section').style.display = 'none';
+            document.getElementById('room-info').style.display = 'block';
+        }
+
+        function joinRoom() {
+            if (!database) {
+                showToast('Firebase 未配置，请先配置', 'error');
+                return;
+            }
+
+            const inputRoomId = document.getElementById('room-id-input').value.trim().toUpperCase();
+            if (!inputRoomId) {
+                showToast('请输入房间号', 'error');
+                return;
+            }
+
+            roomId = inputRoomId;
+            connectToRoom();
+        }
+
+        function connectToRoom() {
+            if (!database || !roomId) return;
+
+            roomRef = database.ref('rooms/' + roomId);
+
+            // 监听数据变化
+            unsubscribe = roomRef.on('value', (snapshot) => {
+                const val = snapshot.val();
+                if (val) {
+                    data = {
+                        guests: val.guests || [],
+                        tables: val.tables || []
+                    };
+                    console.log('数据已同步:', data.guests.length, '宾客');
+                } else {
+                    // 新房间，初始化空数据
+                    data = { guests: [], tables: [] };
+                    roomRef.set(data);
+                }
+
+                if (document.getElementById('main-app').style.display !== 'none') {
+                    renderAll();
+                }
+
+                updateSyncStatus('connected');
+            }, (error) => {
+                console.error('同步失败:', error);
+                updateSyncStatus('disconnected');
+                showToast('连接失败: ' + error.message, 'error');
+            });
+        }
+
+        function enterRoom() {
+            document.getElementById('setup-panel').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            document.getElementById('header-room-id').textContent = roomId;
+
+            // 更新 URL
+            const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?room=' + roomId;
+            window.history.pushState({path: newUrl}, '', newUrl);
+
+            connectToRoom();
+            setupEventListeners();
+            renderAll();
+        }
+
+        function updateSyncStatus(status) {
+            const statusEl = document.getElementById('sync-status');
+            const textEl = document.getElementById('sync-text');
+
+            statusEl.className = 'sync-status ' + status;
+            if (status === 'connected') {
+                textEl.textContent = '✓ 已连接实时同步';
+            } else {
+                textEl.textContent = '✗ 未连接';
+            }
+        }
+
+        function copyRoomId() {
+            navigator.clipboard.writeText(roomId).then(() => {
+                showToast('房间号已复制', 'success');
+            });
+        }
+
+        // 生成只读公开链接
+        function generateShareLink() {
+            if (!roomId) {
+                showToast('请先创建房间', 'error');
+                return;
+            }
+
+            // 使用当前页面URL + ?view=房间号 参数
+            const baseUrl = window.location.href.split('?')[0];
+            const shareUrl = `${baseUrl}?view=${roomId}`;
+
+            document.getElementById('share-link-url').textContent = shareUrl;
+            document.getElementById('share-link-container').style.display = 'block';
+            showToast('只读链接已生成', 'success');
+        }
+
+        function copyShareLink() {
+            const shareUrl = document.getElementById('share-link-url').textContent;
+            navigator.clipboard.writeText(shareUrl).then(() => {
+                showToast('链接已复制', 'success');
+            });
+        }
+
+        // 只读视图模式初始化
+        function initReadOnlyMode(viewRoomId) {
+            // 隐藏创建/加入房间界面
+            document.getElementById('welcome-section').style.display = 'none';
+            document.getElementById('create-room-section').style.display = 'none';
+            document.getElementById('join-room-section').style.display = 'none';
+
+            // 显示主应用
+            document.getElementById('main-app').style.display = 'block';
+
+            // 隐藏编辑功能，显示只读提示
+            document.querySelector('.header h1').textContent = '💒 婚礼座位安排 - 查看模式';
+
+            // 添加只读提示
+            const header = document.querySelector('.header');
+            const readOnlyBanner = document.createElement('div');
+            readOnlyBanner.id = 'read-only-banner';
+            readOnlyBanner.style.cssText = 'background:#FFF3E0;color:#E65100;padding:8px;text-align:center;font-size:0.9rem;';
+            readOnlyBanner.textContent = '👁️ 您正在查看座位安排，无法修改';
+            header.insertBefore(readOnlyBanner, header.firstChild);
+
+            // 隐藏所有编辑按钮和工具栏
+            document.querySelectorAll('.toolbar, .action-btns, .table-card-actions').forEach(el => {
+                el.style.display = 'none';
+            });
+
+            // 隐藏导航栏中的编辑选项，只显示座位图
+            document.querySelector('.nav').innerHTML = `
+                <button class="nav-btn active" data-page="seats">座位图</button>
+            `;
+
+            // 加载数据并显示座位图
+            loadData();
+            renderAll();
+
+            // 如果有 Firebase，尝试从云端加载数据
+            try {
+                firebase.initializeApp(firebaseConfig);
+                const db = firebase.database();
+                const viewRef = db.ref('rooms/' + viewRoomId);
+                viewRef.on('value', (snapshot) => {
+                    const cloudData = snapshot.val();
+                    if (cloudData) {
+                        if (cloudData.guests) data.guests = cloudData.guests;
+                        if (cloudData.tables) data.tables = cloudData.tables;
+                        renderAll();
+                    }
+                });
+            } catch (e) {
+                console.log('Firebase 未配置，使用本地数据');
+            }
+        }
+
+        // 保存数据到 localStorage 或 Firebase
+        function saveData() {
+            // 优先使用本地存储
+            try {
+                localStorage.setItem('wedding_seating_data', JSON.stringify(data));
+                console.log('数据已保存到本地');
+            } catch (e) {
+                console.error('本地保存失败:', e);
+            }
+
+            // 如果有 Firebase 连接，也同步保存
+            if (roomRef) {
+                roomRef.set(data).then(() => {
+                    console.log('数据已同步到云端');
+                }).catch((error) => {
+                    console.error('云端同步失败:', error);
+                });
+            }
+        }
+
+        // 从 localStorage 加载数据
+        function loadData() {
+            try {
+                const saved = localStorage.getItem('wedding_seating_data');
+                console.log('本地存储数据:', saved);
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    if (parsed.guests) data.guests = parsed.guests;
+                    if (parsed.tables) data.tables = parsed.tables;
+                    console.log('已从本地加载数据, 宾客数:', data.guests.length, '桌位数:', data.tables.length);
+                } else {
+                    console.log('本地存储中没有数据');
+                }
+            } catch (e) {
+                console.error('加载本地数据失败:', e);
+            }
+        }
+
+        // 事件监听
+        function setupEventListeners() {
+            // Navigation
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.getElementById(`${btn.dataset.page}-page`).classList.add('active');
+                    renderAll();
+                });
+            });
+
+            // Search and filters
+            document.getElementById('guest-search').addEventListener('input', renderGuestsTable);
+            document.getElementById('group-filter').addEventListener('change', renderGuestsTable);
+            document.getElementById('vip-filter').addEventListener('change', renderGuestsTable);
+
+            // Drop zone
+            const unassignedZone = document.getElementById('unassigned-zone');
+            unassignedZone.addEventListener('dragover', handleDragOver);
+            unassignedZone.addEventListener('dragleave', handleDragLeave);
+            unassignedZone.addEventListener('drop', handleDropToUnassigned);
+
+            // Reset select all when filters change
+            document.getElementById('guest-search').addEventListener('input', () => {
+                document.getElementById('select-all').checked = false;
+            });
+            document.getElementById('group-filter').addEventListener('change', () => {
+                document.getElementById('select-all').checked = false;
+            });
+            document.getElementById('vip-filter').addEventListener('change', () => {
+                document.getElementById('select-all').checked = false;
+            });
+        }
+
+        function renderAll() {
+            renderGuestsTable();
+            renderTablesList();
+            renderUnassignedGuests();
+            renderSeatMap();
+            updateStats();
+        }
+
+        function updateStats() {
+            const totalGuests = data.guests.length;
+            const totalVip = data.guests.filter(g => g.isVip).length;
+            const assignedGuests = data.guests.filter(g => g.tableId).length;
+            const unassignedGuests = totalGuests - assignedGuests;
+
+            document.getElementById('total-guests').textContent = totalGuests;
+            document.getElementById('total-vip').textContent = totalVip;
+            document.getElementById('assigned-guests').textContent = assignedGuests;
+            document.getElementById('unassigned-guests').textContent = unassignedGuests;
+
+            const totalTables = data.tables.length;
+            const totalSeats = data.tables.reduce((sum, t) => sum + t.maxCapacity, 0);
+            const usedSeats = assignedGuests;
+
+            document.getElementById('total-tables').textContent = totalTables;
+            document.getElementById('total-seats').textContent = totalSeats;
+            document.getElementById('used-seats').textContent = usedSeats;
+        }
+
+        // Guest Management
+        function renderGuestsTable() {
+            const search = document.getElementById('guest-search').value.toLowerCase();
+            const groupFilter = document.getElementById('group-filter').value;
+            const vipFilter = document.getElementById('vip-filter').value;
+
+            let guests = data.guests.filter(g => {
+                const matchSearch = g.name.toLowerCase().includes(search) ||
+                    (g.phone && g.phone.includes(search));
+                const matchGroup = !groupFilter || g.group === groupFilter;
+                const matchVip = !vipFilter ||
+                    (vipFilter === 'vip' && g.isVip) ||
+                    (vipFilter === 'non-vip' && !g.isVip);
+                return matchSearch && matchGroup && matchVip;
+            });
+
+            const tbody = document.getElementById('guests-table-body');
+
+            if (guests.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="9" class="empty-state">
+                            <div class="empty-state-icon">👤</div>
+                            <p>暂无宾客信息，点击"添加宾客"开始</p>
+                        </td>
+                    </tr>
+                `;
+                return;
+            }
+
+            tbody.innerHTML = guests.map(guest => {
+                const table = data.tables.find(t => t.id === guest.tableId);
+                const groupClass = `tag-${getGroupClass(guest.group)}`;
+
+                return `
+                    <tr>
+                        <td><input type="checkbox" class="guest-checkbox" value="${guest.id}"></td>
+                        <td><strong>${guest.name}</strong></td>
+                        <td>${guest.phone || '-'}</td>
+                        <td><span class="tag ${groupClass}">${guest.group}</span></td>
+                        <td>${guest.isVip ? '<span class="vip-badge">VIP</span>' : '-'}</td>
+                        <td>${guest.specialNeeds || '-'}</td>
+                        <td>${guest.dietary || '-'}</td>
+                        <td>${table ? table.name : '<span style="color:var(--danger)">未安排</span>'}</td>
+                        <td class="action-btns">
+                            <button class="btn-icon btn-edit" onclick="editGuest('${guest.id}')">编辑</button>
+                            <button class="btn-icon btn-del" onclick="deleteGuest('${guest.id}')">删除</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function getGroupClass(group) {
+            const map = {
+                '家人': 'family',
+                '朋友': 'friend',
+                '同事': 'colleague',
+                '新娘方': 'bride',
+                '新郎方': 'groom'
+            };
+            return map[group] || 'family';
+        }
+
+        function openGuestModal(guestId = null) {
+            currentEditingGuestId = guestId;
+            const modal = document.getElementById('guest-modal');
+            const title = document.getElementById('guest-modal-title');
+            const form = document.getElementById('guest-form');
+
+            if (guestId) {
+                const guest = data.guests.find(g => g.id === guestId);
+                title.textContent = '编辑宾客';
+                document.getElementById('guest-id').value = guest.id;
+                document.getElementById('guest-name').value = guest.name;
+                document.getElementById('guest-phone').value = guest.phone || '';
+                document.getElementById('guest-group').value = guest.group;
+                document.getElementById('guest-vip').checked = guest.isVip;
+                document.getElementById('guest-special').value = guest.specialNeeds || '';
+                document.getElementById('guest-dietary').value = guest.dietary || '无特殊要求';
+                document.getElementById('guest-note').value = guest.note || '';
+            } else {
+                title.textContent = '添加宾客';
+                form.reset();
+                document.getElementById('guest-id').value = '';
+            }
+
+            modal.classList.add('active');
+        }
+
+        function closeGuestModal() {
+            document.getElementById('guest-modal').classList.remove('active');
+            currentEditingGuestId = null;
+        }
+
+        function saveGuest() {
+            const name = document.getElementById('guest-name').value.trim();
+            if (!name) {
+                showToast('请输入宾客姓名', 'error');
+                return;
+            }
+
+            const guestData = {
+                id: document.getElementById('guest-id').value || generateId(),
+                name: name,
+                phone: document.getElementById('guest-phone').value.trim(),
+                group: document.getElementById('guest-group').value,
+                isVip: document.getElementById('guest-vip').checked,
+                specialNeeds: document.getElementById('guest-special').value.trim(),
+                dietary: document.getElementById('guest-dietary').value,
+                note: document.getElementById('guest-note').value.trim(),
+                tableId: null
+            };
+
+            if (currentEditingGuestId) {
+                const index = data.guests.findIndex(g => g.id === currentEditingGuestId);
+                if (index !== -1) {
+                    guestData.tableId = data.guests[index].tableId;
+                    data.guests[index] = guestData;
+                }
+            } else {
+                data.guests.push(guestData);
+            }
+
+            saveData();
+            closeGuestModal();
+            renderAll();
+            showToast(currentEditingGuestId ? '宾客信息已更新' : '宾客添加成功', 'success');
+        }
+
+        function editGuest(id) {
+            openGuestModal(id);
+        }
+
+        function deleteGuest(id) {
+            showConfirm('确定要删除该宾客吗？', () => {
+                data.guests = data.guests.filter(g => g.id !== id);
+                saveData();
+                renderAll();
+                showToast('宾客已删除', 'success');
+            });
+        }
+
+        function toggleSelectAll() {
+            const selectAll = document.getElementById('select-all');
+            const checkboxes = document.querySelectorAll('.guest-checkbox');
+            checkboxes.forEach(cb => cb.checked = selectAll.checked);
+        }
+
+        function getSelectedGuestIds() {
+            const checkboxes = document.querySelectorAll('.guest-checkbox:checked');
+            return Array.from(checkboxes).map(cb => cb.value);
+        }
+
+        function batchDeleteGuests() {
+            const selectedIds = getSelectedGuestIds();
+            if (selectedIds.length === 0) {
+                showToast('请先选择要删除的宾客', 'warning');
+                return;
+            }
+            showConfirm(`确定要删除选中的 ${selectedIds.length} 位宾客吗？`, () => {
+                data.guests = data.guests.filter(g => !selectedIds.includes(g.id));
+                saveData();
+                renderAll();
+                showToast('已删除选中宾客', 'success');
+            });
+        }
+
+        // Table Management
+        function renderTablesList() {
+            const container = document.getElementById('tables-container');
+
+            if (data.tables.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <p>暂无桌位，点击"添加桌位"创建</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = data.tables.map(table => {
+                const guestCount = data.guests.filter(g => g.tableId === table.id).length;
+                const isSelected = selectedTableId === table.id;
+
+                return `
+                    <div class="table-card ${isSelected ? 'selected' : ''}"
+                         onclick="selectTable('${table.id}')"
+                         ondragover="handleTableDragOver(event)"
+                         ondrop="handleTableDrop(event, '${table.id}')">
+                        <div class="table-card-header">
+                            <span class="table-card-title">${table.name}</span>
+                            <span class="table-card-type">${table.type === 'round' ? '圆桌' : '方桌'}</span>
+                        </div>
+                        <div class="table-card-info">
+                            <span>已坐: ${guestCount}/${table.maxCapacity}</span>
+                            <span>${table.maxCapacity - guestCount}个空位</span>
+                        </div>
+                        <div class="table-card-actions">
+                            <button class="btn-icon btn-edit" onclick="event.stopPropagation(); editTable('${table.id}')">编辑</button>
+                            <button class="btn-icon btn-del" onclick="event.stopPropagation(); deleteTable('${table.id}')">删除</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectTable(id) {
+            selectedTableId = selectedTableId === id ? null : id;
+            renderTablesList();
+            renderTableGuests();
+        }
+
+        function renderTableGuests() {
+            const container = document.getElementById('table-guests');
+
+            if (!selectedTableId) {
+                container.innerHTML = '<p style="color:var(--text-light); text-align:center;">点击左侧桌位查看已分配宾客</p>';
+                return;
+            }
+
+            const table = data.tables.find(t => t.id === selectedTableId);
+            const guests = data.guests.filter(g => g.tableId === selectedTableId);
+
+            container.innerHTML = `
+                <h4 style="margin-bottom:12px;">${table.name} - 已分配宾客 (${guests.length}/${table.maxCapacity})</h4>
+                <div class="guest-tags" id="table-guest-tags">
+                    ${guests.length === 0 ? '<p style="color:var(--text-light);">暂无宾客</p>' :
+                        guests.map(guest => `
+                            <span class="guest-tag ${guest.isVip ? 'vip' : ''}"
+                                  draggable="true"
+                                  ondragstart="handleGuestDragStart(event, '${guest.id}')"
+                                  ondragend="handleGuestDragEnd(event)">
+                                ${guest.name}
+                                <span style="cursor:pointer; margin-left:4px;" onclick="removeGuestFromTable('${guest.id}')">&times;</span>
+                            </span>
+                        `).join('')
+                    }
+                </div>
+            `;
+        }
+
+        function renderUnassignedGuests() {
+            const container = document.getElementById('unassigned-guests-list');
+            console.log('渲染未分配宾客, 总宾客数:', data.guests.length);
+            const guests = data.guests.filter(g => !g.tableId);
+            console.log('未分配宾客数:', guests.length);
+
+            if (guests.length === 0) {
+                container.innerHTML = '<span style="color:var(--text-light);">所有宾客已安排座位</span>';
+                return;
+            }
+
+            container.innerHTML = guests.map(guest => `
+                <span class="guest-tag ${guest.isVip ? 'vip' : ''}"
+                      draggable="true"
+                      ondragstart="handleGuestDragStart(event, '${guest.id}')"
+                      ondragend="handleGuestDragEnd(event)">
+                    ${guest.name}
+                </span>
+            `).join('');
+        }
+
+        function openTableModal(tableId = null) {
+            currentEditingTableId = tableId;
+            const modal = document.getElementById('table-modal');
+            const title = document.getElementById('table-modal-title');
+            const form = document.getElementById('table-form');
+
+            if (tableId) {
+                const table = data.tables.find(t => t.id === tableId);
+                title.textContent = '编辑桌位';
+                document.getElementById('table-id').value = table.id;
+                document.getElementById('table-name').value = table.name;
+                document.getElementById('table-type').value = table.type;
+                document.getElementById('table-capacity').value = table.maxCapacity;
+            } else {
+                title.textContent = '添加桌位';
+                form.reset();
+                document.getElementById('table-id').value = '';
+            }
+
+            modal.classList.add('active');
+        }
+
+        function closeTableModal() {
+            document.getElementById('table-modal').classList.remove('active');
+            currentEditingTableId = null;
+        }
+
+        function saveTable() {
+            const name = document.getElementById('table-name').value.trim();
+            if (!name) {
+                showToast('请输入桌号名称', 'error');
+                return;
+            }
+
+            const tableData = {
+                id: document.getElementById('table-id').value || generateId(),
+                name: name,
+                type: document.getElementById('table-type').value,
+                maxCapacity: parseInt(document.getElementById('table-capacity').value) || 10
+            };
+
+            if (currentEditingTableId) {
+                const index = data.tables.findIndex(t => t.id === currentEditingTableId);
+                if (index !== -1) {
+                    const oldTable = data.tables[index];
+                    const currentGuests = data.guests.filter(g => g.tableId === oldTable.id);
+                    if (currentGuests.length > tableData.maxCapacity) {
+                        showToast(`该桌已有${currentGuests.length}人，超出新容量限制`, 'error');
+                        return;
+                    }
+                    data.tables[index] = tableData;
+                }
+            } else {
+                data.tables.push(tableData);
+            }
+
+            saveData();
+            closeTableModal();
+            renderAll();
+            showToast(currentEditingTableId ? '桌位已更新' : '桌位添加成功', 'success');
+        }
+
+        function editTable(id) {
+            openTableModal(id);
+        }
+
+        function deleteTable(id) {
+            showConfirm('删除桌位将释放已分配的宾客，确定要删除吗？', () => {
+                data.guests.forEach(g => {
+                    if (g.tableId === id) {
+                        g.tableId = null;
+                    }
+                });
+                data.tables = data.tables.filter(t => t.id !== id);
+                if (selectedTableId === id) {
+                    selectedTableId = null;
+                }
+                saveData();
+                renderAll();
+                showToast('桌位已删除', 'success');
+            });
+        }
+
+        // Drag and Drop
+        function handleGuestDragStart(event, guestId) {
+            console.log('DragStart:', guestId);
+            draggedGuestId = guestId;
+            event.currentTarget.classList.add('dragging');
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', guestId);
+        }
+
+        function handleGuestDragEnd(event) {
+            console.log('DragEnd');
+            event.currentTarget.classList.remove('dragging');
+            draggedGuestId = null;
+        }
+
+        function handleDragOver(event) {
+            console.log('DragOver unassigned');
+            event.preventDefault();
+            event.currentTarget.classList.add('drag-over');
+        }
+
+        function handleDragLeave(event) {
+            console.log('DragLeave unassigned');
+            event.currentTarget.classList.remove('drag-over');
+        }
+
+        function handleDropToUnassigned(event) {
+            console.log('Drop to unassigned, guestId:', draggedGuestId);
+            event.preventDefault();
+            event.currentTarget.classList.remove('drag-over');
+
+            if (draggedGuestId) {
+                const guest = data.guests.find(g => g.id === draggedGuestId);
+                if (guest) {
+                    guest.tableId = null;
+                    saveData();
+                    renderAll();
+                    showToast(`${guest.name} 已移至未分配`, 'success');
+                }
+            }
+        }
+
+        function handleTableDragOver(event) {
+            console.log('DragOver table');
+            event.preventDefault();
+            event.currentTarget.classList.add('drag-over');
+        }
+
+        function handleTableDrop(event, tableId) {
+            console.log('Drop to table:', tableId, 'guestId:', draggedGuestId);
+            event.preventDefault();
+            event.currentTarget.classList.remove('drag-over');
+
+            if (!draggedGuestId) {
+                console.log('No dragged guest!');
+                showToast('拖拽失败，请重试', 'error');
+                return;
+            }
+
+            const table = data.tables.find(t => t.id === tableId);
+            const currentCount = data.guests.filter(g => g.tableId === tableId).length;
+
+            if (currentCount >= table.maxCapacity) {
+                showToast(`${table.name} 已满员`, 'warning');
+                return;
+            }
+
+            const guest = data.guests.find(g => g.id === draggedGuestId);
+            if (guest) {
+                guest.tableId = tableId;
+                saveData();
+                renderAll();
+                showToast(`${guest.name} 已安排到 ${table.name}`, 'success');
+            } else {
+                console.log('Guest not found!');
+                showToast('宾客不存在', 'error');
+            }
+        }
+
+        function removeGuestFromTable(guestId) {
+            const guest = data.guests.find(g => g.id === guestId);
+            if (guest) {
+                guest.tableId = null;
+                saveData();
+                renderAll();
+                showToast(`${guest.name} 已移至未分配`, 'success');
+            }
+        }
+
+        // Seat Map
+        function renderSeatMap() {
+            const container = document.getElementById('seat-map-grid');
+
+            if (data.tables.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-state-icon">🪑</div>
+                        <p>暂无桌位，请先创建桌位</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = data.tables.map(table => {
+                const guests = data.guests.filter(g => g.tableId === table.id);
+                const isFull = guests.length >= table.maxCapacity;
+
+                return `
+                    <div class="seat-table"
+                         ondragover="handleTableDragOver(event)"
+                         ondrop="handleTableDrop(event, '${table.id}')">
+                        <div class="seat-table-header">
+                            <span class="seat-table-name">${table.name}</span>
+                            <span class="seat-table-count">${guests.length}/${table.maxCapacity}</span>
+                        </div>
+                        <div class="seat-table-guests">
+                            ${guests.length === 0 ? '<span class="empty-table">拖拽宾客至此</span>' :
+                                guests.map(guest => `
+                                    <span class="seat-guest ${guest.isVip ? 'vip' : ''}"
+                                          draggable="true"
+                                          ondragstart="handleGuestDragStart(event, '${guest.id}')"
+                                          ondragend="handleGuestDragEnd(event)"
+                                          title="${guest.name}${guest.isVip ? ' (VIP)' : ''}">
+                                        ${guest.name}
+                                    </span>
+                                `).join('')
+                            }
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function resetAllSeats() {
+            showConfirm('确定要重置所有座位安排吗？', () => {
+                data.guests.forEach(g => g.tableId = null);
+                saveData();
+                renderAll();
+                showToast('所有座位已重置', 'success');
+            });
+        }
+
+        // Data Operations
+        function exportJSON() {
+            const json = JSON.stringify(data, null, 2);
+            downloadFile(json, 'wedding_seating.json', 'application/json');
+            showToast('JSON数据已导出', 'success');
+        }
+
+        function exportCSV() {
+            const headers = ['姓名', '手机号', '分组', 'VIP', '特殊需求', '饮食偏好', '备注', '座位'];
+            const rows = data.guests.map(g => {
+                const table = data.tables.find(t => t.id === g.tableId);
+                return [
+                    g.name,
+                    g.phone || '',
+                    g.group,
+                    g.isVip ? '是' : '否',
+                    g.specialNeeds || '',
+                    g.dietary || '',
+                    g.note || '',
+                    table ? table.name : '未安排'
+                ];
+            });
+
+            const csv = [headers.join(','), ...rows.map(r => r.map(v => `"${v}"`).join(','))].join('\n');
+            downloadFile(csv, 'guests.csv', 'text/csv;charset=utf-8;');
+            showToast('CSV已导出', 'success');
+        }
+
+        function importJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const imported = JSON.parse(e.target.result);
+                    if (!imported.guests || !imported.tables) {
+                        throw new Error('Invalid format');
+                    }
+                    data = imported;
+                    saveData();
+                    renderAll();
+                    showToast('数据导入成功', 'success');
+                } catch (err) {
+                    showToast('导入失败，文件格式错误', 'error');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = '';
+        }
+
+        function downloadFile(content, filename, type) {
+            const blob = new Blob([content], { type });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Modal helpers
+        function showConfirm(message, onConfirm) {
+            document.getElementById('confirm-message').textContent = message;
+            document.getElementById('confirm-btn').onclick = () => {
+                closeConfirmModal();
+                onConfirm();
+            };
+            document.getElementById('confirm-modal').classList.add('active');
+        }
+
+        function closeConfirmModal() {
+            document.getElementById('confirm-modal').classList.remove('active');
+        }
+
+        // Toast
+        function showToast(message, type = 'info') {
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 3000);
+        }
+
+        // Utils
+        function generateId() {
+            return 'id_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        // Start
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
