@@ -1165,13 +1165,12 @@
             // 检查 URL 参数
             const urlParams = new URLSearchParams(window.location.search);
             const joinRoom = urlParams.get('room');
-            const viewRoom = urlParams.get('view');  // 只读查看模式
+            const viewData = urlParams.get('data');  // 只读查看模式（URL中包含数据）
 
             // 只读视图模式
-            if (viewRoom) {
+            if (viewData) {
                 isReadOnly = true;
-                roomId = viewRoom;
-                initReadOnlyMode(viewRoom);
+                initReadOnlyMode();
                 return;
             }
 
@@ -1306,16 +1305,19 @@
             });
         }
 
-        // 生成只读公开链接
+        // 生成只读公开链接（将数据编码到URL中，无需服务器）
         function generateShareLink() {
-            if (!roomId) {
-                showToast('请先创建房间', 'error');
+            if (data.guests.length === 0 && data.tables.length === 0) {
+                showToast('请先添加宾客或桌位', 'error');
                 return;
             }
 
-            // 使用当前页面URL + ?view=房间号 参数
+            // 将数据编码为 base64 放入 URL
+            const dataStr = JSON.stringify(data);
+            const encodedData = btoa(unescape(encodeURIComponent(dataStr)));
+
             const baseUrl = window.location.href.split('?')[0];
-            const shareUrl = `${baseUrl}?view=${roomId}`;
+            const shareUrl = `${baseUrl}?data=${encodedData}`;
 
             document.getElementById('share-link-url').textContent = shareUrl;
             document.getElementById('share-link-container').style.display = 'block';
@@ -1330,7 +1332,7 @@
         }
 
         // 只读视图模式初始化
-        function initReadOnlyMode(viewRoomId) {
+        function initReadOnlyMode() {
             // 隐藏创建/加入房间界面
             document.getElementById('welcome-section').style.display = 'none';
             document.getElementById('create-room-section').style.display = 'none';
@@ -1360,26 +1362,24 @@
                 <button class="nav-btn active" data-page="seats">座位图</button>
             `;
 
-            // 加载数据并显示座位图
-            loadData();
-            renderAll();
+            // 从 URL 参数读取数据
+            const urlParams = new URLSearchParams(window.location.search);
+            const encodedData = urlParams.get('data');
 
-            // 如果有 Firebase，尝试从云端加载数据
-            try {
-                firebase.initializeApp(firebaseConfig);
-                const db = firebase.database();
-                const viewRef = db.ref('rooms/' + viewRoomId);
-                viewRef.on('value', (snapshot) => {
-                    const cloudData = snapshot.val();
-                    if (cloudData) {
-                        if (cloudData.guests) data.guests = cloudData.guests;
-                        if (cloudData.tables) data.tables = cloudData.tables;
-                        renderAll();
-                    }
-                });
-            } catch (e) {
-                console.log('Firebase 未配置，使用本地数据');
+            if (encodedData) {
+                try {
+                    const dataStr = decodeURIComponent(escape(atob(encodedData)));
+                    const loadedData = JSON.parse(dataStr);
+                    if (loadedData.guests) data.guests = loadedData.guests;
+                    if (loadedData.tables) data.tables = loadedData.tables;
+                    console.log('已从链接加载数据');
+                } catch (e) {
+                    console.error('加载数据失败:', e);
+                    showToast('数据加载失败', 'error');
+                }
             }
+
+            renderAll();
         }
 
         // 保存数据到 localStorage 或 Firebase
