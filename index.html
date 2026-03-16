@@ -1224,13 +1224,20 @@
             window.cloudBinId = roomId;
             localStorage.setItem('cloud_bin_id', roomId);
 
-            document.getElementById('current-room-id').textContent = roomId;
+            // 隐藏欢迎界面，显示主应用
+            document.getElementById('welcome-section').style.display = 'none';
+            document.getElementById('setup-panel').style.display = 'none';
+            document.getElementById('main-app').style.display = 'block';
+            document.getElementById('header-room-id').textContent = roomId;
 
-            document.getElementById('create-room-section').style.display = 'none';
-            document.getElementById('room-info').style.display = 'block';
+            // 更新 URL
+            const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?room=' + roomId;
+            window.history.pushState({path: newUrl}, '', newUrl);
 
             // 创建云端存储
             saveToCloud();
+            setupEventListeners();
+            renderAll();
             showToast('房间已创建，数据将同步到云端', 'success');
         }
 
