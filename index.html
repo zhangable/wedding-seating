@@ -959,17 +959,6 @@
             <div class="page" id="tables-page">
                 <div class="toolbar">
                     <button class="btn btn-primary" onclick="openTableModal()">+ 添加桌位</button>
-                    <div class="toolbar-right">
-                        <button class="btn btn-secondary" onclick="generateShareLink()">生成分享链接</button>
-                        <button class="btn btn-info" onclick="copyRoomIdForShare()">复制房间号</button>
-                    </div>
-                </div>
-                <div id="share-link-container" style="display:none;padding:10px 20px;background:#E3F2FD;border-radius:8px;margin-bottom:15px;">
-                    <p style="font-size:0.9rem;color:var(--text-light)">复制以下链接分享给宾客查看座位安排（仅限查看）：</p>
-                    <div class="room-id-display">
-                        <code id="share-link-url" style="font-size:0.8rem;word-break:break-all;"></code>
-                        <button class="copy-btn" onclick="copyShareLink()">复制链接</button>
-                    </div>
                 </div>
 
                 <div class="stats">
@@ -1161,32 +1150,16 @@
         let currentEditingTableId = null;
         let selectedTableId = null;
         let draggedGuestId = null;
-        let isReadOnly = false;  // 只读模式标志
 
         // 初始化
         function init() {
-            // 检查 URL 参数
+            // 检查 URL 中的房间号
             const urlParams = new URLSearchParams(window.location.search);
             const joinRoom = urlParams.get('room');
-            const viewData = urlParams.get('data');  // 只读查看模式（URL中包含数据）
-
-            // 只读视图模式
-            if (viewData) {
-                isReadOnly = true;
-                initReadOnlyMode();
-                return;
-            }
 
             if (joinRoom) {
                 document.getElementById('room-id-input').value = joinRoom;
                 showJoinRoom();
-                roomId = joinRoom;
-                // 加入房间
-                document.getElementById('setup-panel').style.display = 'none';
-                document.getElementById('main-app').style.display = 'block';
-                document.getElementById('header-room-id').textContent = roomId;
-                loadData();
-                renderAll();
             }
 
             // 加载本地数据
@@ -1194,6 +1167,15 @@
 
             // 渲染页面
             renderAll();
+
+            // 初始化 Firebase（可选）
+            try {
+                firebase.initializeApp(firebaseConfig);
+                database = firebase.database();
+                updateSyncStatus('disconnected');
+            } catch (e) {
+                console.log('Firebase 未配置，使用本地存储模式');
+            }
         }
 
         // 房间管理
@@ -1214,27 +1196,24 @@
         }
 
         function createRoom() {
-            // 创建新房间
-            roomId = generateRoomId();
-            localStorage.setItem('wedding_room_id', roomId);
+            if (!database) {
+                showToast('Firebase 未配置，请先配置', 'error');
+                return;
+            }
 
+            roomId = generateRoomId();
             document.getElementById('current-room-id').textContent = roomId;
 
-            // 隐藏欢迎界面，显示主应用
-            document.getElementById('setup-panel').style.display = 'none';
-            document.getElementById('main-app').style.display = 'block';
-            document.getElementById('header-room-id').textContent = roomId;
-
-            // 更新 URL
-            const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?room=' + roomId;
-            window.history.pushState({path: newUrl}, '', newUrl);
-
-            setupEventListeners();
-            renderAll();
-            showToast('房间已创建', 'success');
+            document.getElementById('create-room-section').style.display = 'none';
+            document.getElementById('room-info').style.display = 'block';
         }
 
         function joinRoom() {
+            if (!database) {
+                showToast('Firebase 未配置，请先配置', 'error');
+                return;
+            }
+
             const inputRoomId = document.getElementById('room-id-input').value.trim().toUpperCase();
             if (!inputRoomId) {
                 showToast('请输入房间号', 'error');
@@ -1242,32 +1221,39 @@
             }
 
             roomId = inputRoomId;
-            localStorage.setItem('wedding_room_id', roomId);
-
-            // 加入房间，显示主应用
-            document.getElementById('setup-panel').style.display = 'none';
-            document.getElementById('main-app').style.display = 'block';
-            document.getElementById('header-room-id').textContent = roomId;
-
-            // 更新 URL
-            const newUrl = window.location.protocol + "//" + window.location.host + window.location.pathname + '?room=' + roomId;
-            window.history.pushState({path: newUrl}, '', newUrl);
-
-            // 加载本地数据
-            loadData();
-            renderAll();
-            showToast('已加入房间', 'success');
+            connectToRoom();
         }
 
         function connectToRoom() {
-            // 连接房间，定期刷新页面
-            if (!roomId) return;
+            if (!database || !roomId) return;
 
-            // 定期从 localStorage 加载最新数据
-            setInterval(() => {
-                loadData();
-                renderAll();
-            }, 3000); // 每3秒刷新一次
+            roomRef = database.ref('rooms/' + roomId);
+
+            // 监听数据变化
+            unsubscribe = roomRef.on('value', (snapshot) => {
+                const val = snapshot.val();
+                if (val) {
+                    data = {
+                        guests: val.guests || [],
+                        tables: val.tables || []
+                    };
+                    console.log('数据已同步:', data.guests.length, '宾客');
+                } else {
+                    // 新房间，初始化空数据
+                    data = { guests: [], tables: [] };
+                    roomRef.set(data);
+                }
+
+                if (document.getElementById('main-app').style.display !== 'none') {
+                    renderAll();
+                }
+
+                updateSyncStatus('connected');
+            }, (error) => {
+                console.error('同步失败:', error);
+                updateSyncStatus('disconnected');
+                showToast('连接失败: ' + error.message, 'error');
+            });
         }
 
         function enterRoom() {
@@ -1302,118 +1288,23 @@
             });
         }
 
-        function copyRoomIdForShare() {
-            if (!roomId) {
-                showToast('请先创建或加入房间', 'error');
-                return;
-            }
-            // 生成带房间号的完整链接
-            const baseUrl = window.location.href.split('?')[0];
-            const shareUrl = `${baseUrl}?room=${roomId}`;
-            navigator.clipboard.writeText(shareUrl).then(() => {
-                showToast('房间链接已复制，可发送给其他人一起编辑', 'success');
-            });
-        }
-
-        // 生成只读公开链接（将数据编码到URL中，无需服务器）
-        function generateShareLink() {
-            if (data.guests.length === 0 && data.tables.length === 0) {
-                showToast('请先添加宾客或桌位', 'error');
-                return;
-            }
-
-            // 将数据编码为 base64 放入 URL
-            const dataStr = JSON.stringify(data);
-            const encodedData = btoa(unescape(encodeURIComponent(dataStr)));
-
-            const baseUrl = window.location.href.split('?')[0];
-            const shareUrl = `${baseUrl}?data=${encodedData}`;
-
-            document.getElementById('share-link-url').textContent = shareUrl;
-            document.getElementById('share-link-container').style.display = 'block';
-            showToast('只读链接已生成', 'success');
-        }
-
-        function copyShareLink() {
-            const shareUrl = document.getElementById('share-link-url').textContent;
-            navigator.clipboard.writeText(shareUrl).then(() => {
-                showToast('链接已复制', 'success');
-            });
-        }
-
-        // 只读视图模式初始化
-        function initReadOnlyMode() {
-            // 隐藏创建/加入房间界面
-            document.getElementById('welcome-section').style.display = 'none';
-            document.getElementById('create-room-section').style.display = 'none';
-            document.getElementById('join-room-section').style.display = 'none';
-
-            // 显示主应用
-            document.getElementById('main-app').style.display = 'block';
-
-            // 隐藏编辑功能，显示只读提示
-            document.querySelector('.header h1').textContent = '💒 婚礼座位安排 - 查看模式';
-
-            // 添加只读提示
-            const header = document.querySelector('.header');
-            const readOnlyBanner = document.createElement('div');
-            readOnlyBanner.id = 'read-only-banner';
-            readOnlyBanner.style.cssText = 'background:#FFF3E0;color:#E65100;padding:8px;text-align:center;font-size:0.9rem;';
-            readOnlyBanner.textContent = '👁️ 您正在查看座位安排，无法修改';
-            header.insertBefore(readOnlyBanner, header.firstChild);
-
-            // 隐藏所有编辑按钮和工具栏
-            document.querySelectorAll('.toolbar, .action-btns, .table-card-actions').forEach(el => {
-                el.style.display = 'none';
-            });
-
-            // 隐藏导航栏中的编辑选项，只显示座位图
-            document.querySelector('.nav').innerHTML = `
-                <button class="nav-btn active" data-page="seats">座位图</button>
-            `;
-
-            // 从 URL 参数读取数据
-            const urlParams = new URLSearchParams(window.location.search);
-            const encodedData = urlParams.get('data');
-
-            if (encodedData) {
-                try {
-                    const dataStr = decodeURIComponent(escape(atob(encodedData)));
-                    const loadedData = JSON.parse(dataStr);
-                    if (loadedData.guests) data.guests = loadedData.guests;
-                    if (loadedData.tables) data.tables = loadedData.tables;
-                    console.log('已从链接加载数据');
-                } catch (e) {
-                    console.error('加载数据失败:', e);
-                    showToast('数据加载失败', 'error');
-                }
-            }
-
-            renderAll();
-        }
-
-        // 保存数据到 localStorage
+        // 保存数据到 localStorage 或 Firebase
         function saveData() {
+            // 优先使用本地存储
             try {
                 localStorage.setItem('wedding_seating_data', JSON.stringify(data));
                 console.log('数据已保存到本地');
             } catch (e) {
-                console.error('保存失败:', e);
+                console.error('本地保存失败:', e);
             }
-        }
-                // 更新现有 bin
-                try {
-                    await fetch(`https://api.jsonbin.io/v3/b/${cloudBinId}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json'
-                        },
-                        body: JSON.stringify(data)
-                    });
-                    console.log('已更新云端数据');
-                } catch (e) {
-                    console.error('云端更新失败:', e);
-                }
+
+            // 如果有 Firebase 连接，也同步保存
+            if (roomRef) {
+                roomRef.set(data).then(() => {
+                    console.log('数据已同步到云端');
+                }).catch((error) => {
+                    console.error('云端同步失败:', error);
+                });
             }
         }
 
